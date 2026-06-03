@@ -65,32 +65,12 @@ Ensure you have **Python 3.8+** installed on your operating system.
    ```bash
    cd backend
    ```
-
-2. Create a virtual environment to isolate project packages:
-   ```bash
-   python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-   * **Windows (Command Prompt):**
-     ```cmd
-     venv\Scripts\activate
-     ```
-   * **Windows (PowerShell):**
-     ```powershell
-     .\venv\Scripts\Activate.ps1
-     ```
-   * **macOS / Linux:**
-     ```bash
-     source venv/bin/activate
-     ```
-
-4. Install the required dependencies:
+2. Install the required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-5. Configure environment variables:
+3. Configure environment variables:
    * Copy the example file to a new `.env` file:
      ```bash
      copy .env.example .env
@@ -105,7 +85,7 @@ Ensure you have **Python 3.8+** installed on your operating system.
      ```
      *Note: If you leave `SARVAM_API_KEY` blank or unchanged, the backend automatically operates in **Demo Mode**, yielding highly interactive walkthrough prompts and mock completions so you can still preview the UI and local RAG functionalities.*
 
-6. Start the FastAPI server:
+4. Start the FastAPI server:
    ```bash
    python app/main.py
    ```
