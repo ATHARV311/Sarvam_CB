@@ -1,0 +1,239 @@
+<!DOCTYPE html> 
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SarvamAI Enterprise Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand-section">
+                <div class="logo-container">
+                    <i class="fa-solid fa-brain-circuit logo-icon"></i>
+                    <div class="brand-text">
+                        <h1>Sarvam<span>AI</span></h1>
+                        <span class="sub-brand">Corporate Assistant</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary new-chat-btn" id="new-chat-btn">
+                <i class="fa-solid fa-plus"></i> New Chat
+            </button>
+
+            <div class="history-panel card" id="history-panel">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Chat History</h3>
+                <div class="sessions-list-container">
+                    <ul class="sessions-list" id="sessions-list">
+                        <!-- Populated by JavaScript -->
+                    </ul>
+                </div>
+            </div>
+
+            <div class="status-panel card">
+                <div class="panel-header">
+                    <h3><i class="fa-solid fa-server"></i> System Status</h3>
+                    <span class="badge status-badge demo-badge" id="system-mode">Demo Mode</span>
+                </div>
+                <div class="status-details">
+                    <div class="status-row">
+                        <span>API Connection:</span>
+                        <span id="api-status"><i class="fa-solid fa-circle-nodes pulse-icon"></i> Scanning...</span>
+                    </div>
+                    <div class="status-row">
+                        <span>Indexed Chunks:</span>
+                        <span id="indexed-chunks" class="highlight-text">0 chunks</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-panel card">
+                <h3><i class="fa-solid fa-sliders"></i> Preferences</h3>
+                
+                <div class="form-group">
+                    <label for="language-select">Target Language</label>
+                    <select id="language-select">
+                        <option value="en-IN">English (India)</option>
+                        <option value="hi-IN" selected>Hindi (हिन्दी)</option>
+                        <option value="bn-IN">Bengali (বাংলা)</option>
+                        <option value="ta-IN">Tamil (தமிழ்)</option>
+                        <option value="te-IN">Telugu (తెలుగు)</option>
+                        <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+                        <option value="ml-IN">Malayalam (മലയാളം)</option>
+                        <option value="mr-IN">Marathi (मराठी)</option>
+                        <option value="gu-IN">Gujarati (ગુજરાતી)</option>
+                        <option value="pa-IN">Punjabi (ਪੰਜਾਬੀ)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="speaker-select">TTS Voice Speaker</label>
+                    <select id="speaker-select">
+                        <option value="ritu" selected>Ritu (Female - Hindi/Multi)</option>
+                        <option value="aditya">Aditya (Male - Hindi/Multi)</option>
+                        <option value="shubh">Shubh (Male - Telephony/Energetic)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="voice-pace">Speech Pace: <span id="pace-val">1.0x</span></label>
+                    <input type="range" id="voice-pace" min="0.7" max="1.5" step="0.1" value="1.0">
+                </div>
+
+                <div class="toggle-group">
+                    <label class="toggle-switch" for="voice-output-toggle">
+                        <input type="checkbox" id="voice-output-toggle" title="Enable auto-play voice responses">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="toggle-label">Auto-play TTS Voice Responses</span>
+                </div>
+            </div>
+
+            <!-- RAG Upload Section -->
+            <div class="knowledge-panel card">
+                <h3><i class="fa-solid fa-folder-open"></i> Knowledge Grounding</h3>
+                <p class="panel-desc">Upload company PDFs/Text to index into local RAG memory.</p>
+                
+                <div class="upload-dropzone" id="dropzone">
+                    <input type="file" id="file-input" accept=".pdf,.txt,.md,.json" title="Upload a document file">
+                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                    <span>Drag & Drop or <strong class="browse-link">Browse</strong></span>
+                    <span class="file-limits">PDF, TXT, MD, JSON (Max 10MB)</span>
+                </div>
+
+                <div id="upload-progress-container" class="upload-progress-container hidden">
+                    <div class="upload-progress-bar">
+                        <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                    </div>
+                    <span class="upload-progress-text" id="upload-progress-text">Uploading...</span>
+                </div>
+
+                <div class="sources-list-container">
+                    <h4>Indexed Source Files</h4>
+                    <ul class="sources-list" id="sources-list">
+                        <li class="empty-sources">No documents uploaded yet.</li>
+                    </ul>
+                </div>
+                
+                <button class="btn btn-danger btn-sm w-100" id="clear-docs-btn">
+                    <i class="fa-solid fa-trash-can"></i> Clear Knowledge Base
+                </button>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>Powered by Sarvam AI</p>
+                <div class="theme-switcher">
+                    <i class="fa-solid fa-moon active" id="dark-theme-btn"></i>
+                    <i class="fa-solid fa-sun" id="light-theme-btn"></i>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-area">
+            <!-- Chat Header -->
+            <header class="chat-header">
+                <div class="chat-header-info">
+                    <div class="avatar">
+                        <i class="fa-solid fa-robot"></i>
+                        <span class="online-indicator"></span>
+                    </div>
+                    <div>
+                        <h2>Corporate Agent</h2>
+                        <span class="model-badge"><i class="fa-solid fa-microchip"></i> sarvam-30b (optimized)</span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="action-btn" id="use-rag-toggle" title="Toggle RAG Document Retrieval" class="active">
+                        <i class="fa-solid fa-book-atlas"></i> RAG Grounding: <span id="rag-status-text">ON</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Conversation Window -->
+            <div class="chat-messages" id="chat-messages">
+                <!-- Welcome Message -->
+                <div class="message system-welcome">
+                    <div class="welcome-card card">
+                        <div class="welcome-icon-wrapper">
+                            <i class="fa-solid fa-sparkles"></i>
+                        </div>
+                        <h2>How can I assist you today?</h2>
+                        <p>I am your specialized corporate assistant powered by <strong>Sarvam AI</strong>. Upload documents to query company secrets, or speak directly in your regional language!</p>
+                        
+                        <div class="suggested-queries">
+                            <h4>Suggested Quick Prompts</h4>
+                            <div class="suggestion-chips">
+                                <button class="chip" data-query="Explain how RAG grounding works in this chatbot.">💡 Tell me about RAG Grounding</button>
+                                <button class="chip" data-query="How does Sarvam AI optimize for Indian languages?">🇮🇳 Indian Language Optimization</button>
+                                <button class="chip" data-query="Help me write a professional leave request email in formal English and Hindi.">📝 Leave Request Email</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Playback Floating Bar (when voice is generating/playing) -->
+            <div class="voice-player-bar hidden" id="voice-player-container">
+                <div class="voice-player-details">
+                    <i class="fa-solid fa-volume-high voice-icon wave-animation"></i>
+                    <div class="voice-player-meta">
+                        <span class="voice-title">Playing AI Response</span>
+                        <span class="voice-subtitle" id="voice-playing-lang">Hindi Voice (Ritu)</span>
+                    </div>
+                </div>
+                <div class="voice-player-controls">
+                    <audio id="global-audio-player"></audio>
+                    <button class="voice-control-btn" id="audio-play-pause-btn" title="Pause audio playback" aria-label="Pause audio playback"><i class="fa-solid fa-pause"></i></button>
+                    <button class="voice-control-btn" id="audio-stop-btn" title="Stop audio playback" aria-label="Stop audio playback"><i class="fa-solid fa-square"></i></button>
+                </div>
+            </div>
+
+            <!-- Chat Input Area -->
+            <footer class="chat-input-area">
+                <div class="input-container">
+                    <button class="input-action-btn" id="mic-btn" title="Speak (Voice Chat)">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <button class="input-action-btn" id="ocr-btn" title="Scan Image/PDF (OCR)">
+                        <i class="fa-solid fa-camera"></i>
+                    </button>
+                    <input type="file" id="ocr-file-input" accept="image/*,.pdf" title="Upload an image or PDF for OCR">
+                    
+                    <div class="mic-recording-indicator hidden" id="mic-recording-ui">
+                        <span class="rec-dot"></span>
+                        <span class="rec-text">Listening... Speak in <span id="rec-lang-label">Hindi</span></span>
+                        <div class="voice-waves">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                        <button class="btn btn-sm btn-primary" id="stop-mic-btn">Done</button>
+                        <button class="btn btn-sm btn-secondary" id="cancel-mic-btn">Cancel</button>
+                    </div>
+
+                    <textarea id="chat-input-textarea" placeholder="Ask a question about HR, IT policies, or search document knowledge..." rows="1"></textarea>
+                    
+                    <button class="send-btn" id="send-btn" disabled title="Send message" aria-label="Send message">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="input-footer-text">
+                    Sarvam AI models may produce inaccurate response details. Ground responses by uploading verified sources.
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Custom App Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
