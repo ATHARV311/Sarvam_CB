@@ -19,12 +19,13 @@ logger = logging.getLogger(__name__)
 
 class SarvamClient:
     def __init__(self):
-        # ─── HARDCODE OVERRIDE FOR DIAGNOSTICS ───
-        self.api_key = "sk_tpf2ghdu_iCHDVt42d0ov0whhXwBbCXmf"
+        self.api_key = os.getenv("SARVAM_API_KEY")
         self.base_url = "https://api.sarvam.ai"
-        self.is_demo = False
         
-        print(f"🚀 FORCE BOOT: Sarvam client initialized with direct key override!")
+        # Determine if we are in demo mode
+        self.is_demo = not self.api_key or len(self.api_key.strip()) < 10
+        if self.is_demo:
+            logger.warning("SARVAM_API_KEY not found. Running in DEMO MODE (Mock Responses).")
             
     def _get_headers(self):
         return {
@@ -200,6 +201,59 @@ class SarvamClient:
             }
             
     def digitize_document(self, file_bytes: bytes, file_name: str, language_code: str = "en-IN") -> dict:
+        """
+        Orchestrates document digitization. For PDFs larger than 10 pages,
+        splits the document into chunks, processes sequentially, and concatenates results.
+        """
+        if self.is_demo:
+            return self._digitize_single_file(file_bytes, file_name, language_code)
+
+        try:
+            if file_name.lower().endswith('.pdf'):
+                import io
+                from pypdf import PdfReader, PdfWriter
+                
+                reader = PdfReader(io.BytesIO(file_bytes))
+                total_pages = len(reader.pages)
+                
+                if total_pages > 10:
+                    logger.info(f"PDF has {total_pages} pages. Splitting into 10-page chunks...")
+                    full_text = ""
+                    chunk_jobs = []
+                    
+                    for i in range(0, total_pages, 10):
+                        writer = PdfWriter()
+                        for j in range(i, min(i + 10, total_pages)):
+                            writer.add_page(reader.pages[j])
+                            
+                        chunk_bytes_io = io.BytesIO()
+                        writer.write(chunk_bytes_io)
+                        chunk_bytes = chunk_bytes_io.getvalue()
+                        
+                        chunk_name = f"{os.path.splitext(file_name)[0]}_part_{i//10 + 1}.pdf"
+                        logger.info(f"Processing chunk {i//10 + 1}: pages {i+1} to {min(i + 10, total_pages)}")
+                        
+                        res = self._digitize_single_file(chunk_bytes, chunk_name, language_code)
+                        if res.get("error"):
+                            logger.error(f"Chunk processing failed: {res.get('message')}")
+                            return {"error": True, "message": f"Failed to process PDF chunk {i//10 + 1}: {res.get('message')}"}
+                        
+                        full_text += f"\n\n<!-- PDF CHUNK {i//10 + 1} -->\n\n" + res.get("text", "")
+                        chunk_jobs.append(res.get("job_id"))
+                        
+                    return {
+                        "success": True,
+                        "text": full_text.strip(),
+                        "job_id": ",".join([str(j) for j in chunk_jobs if j])
+                    }
+        except Exception as e:
+            logger.error(f"Error handling PDF chunking: {e}")
+            return {"error": True, "message": f"Failed to split and process PDF: {str(e)}"}
+
+        # If not PDF or <= 10 pages, process normally
+        return self._digitize_single_file(file_bytes, file_name, language_code)
+
+    def _digitize_single_file(self, file_bytes: bytes, file_name: str, language_code: str = "en-IN") -> dict:
         """
         Orchestrates the entire asynchronous Document Digitization (OCR) workflow:
         1. POST /doc-digitization/job/v1 to initialize the job and get a job_id.

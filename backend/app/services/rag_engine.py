@@ -1,44 +1,72 @@
 import os
 import re
 import json
-import math
 import warnings
+import shutil
 import requests
+import tempfile
 
 # Suppress CryptographyDeprecationWarning from pypdf import of ARC4
 warnings.filterwarnings("ignore", message=".*ARC4 has been moved to cryptography.*")
 
-from pypdf import PdfReader
 from app.config import settings
+
+from langchain_core.documents import Document
+from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
 
 class RAGEngine:
     def __init__(self):
-        self.index_path = os.path.join(settings.DB_DIR, "documents_index.json")
-        self.documents = []  # List of chunks: {"id": str, "file": str, "text": str}
-        self.load_index()
+        self.db_dir = os.path.join(tempfile.gettempdir(), "sarvam_chroma_db")
+        self.metadata_path = os.path.join(tempfile.gettempdir(), "sarvam_documents_metadata.json")
+        self.chunk_size = 500
+        self.chunk_overlap = 50
+        self.metadata = {"files": [], "total_chunks": 0}
+        self.load_metadata()
+        
+        # Initialize HuggingFace Multilingual Embeddings with Vyakyarth
+        self.embeddings = HuggingFaceEmbeddings(model_name="krutrim-ai-labs/Vyakyarth")
+        
+        # Initialize Vector Store
+        self.vector_store = Chroma(persist_directory=self.db_dir, embedding_function=self.embeddings)
 
-    def load_index(self):
-        """Loads index from JSON database if it exists."""
-        if os.path.exists(self.index_path):
+    def load_metadata(self):
+        """Loads metadata from JSON database if it exists."""
+        old_total = self.metadata.get("total_chunks", 0)
+        if os.path.exists(self.metadata_path):
             try:
-                with open(self.index_path, "r", encoding="utf-8") as f:
-                    self.documents = json.load(f)
+                with open(self.metadata_path, "r", encoding="utf-8") as f:
+                    self.metadata = json.load(f)
             except Exception as e:
-                print(f"Error loading index: {e}")
-                self.documents = []
+                print(f"Error loading metadata: {e}")
+                self.metadata = {"files": [], "total_chunks": 0}
+                
+        # If a background Celery worker added chunks to the database, reload Chroma
+        new_total = self.metadata.get("total_chunks", 0)
+        if hasattr(self, 'vector_store') and new_total != old_total:
+            print(f"🔄 Reloading ChromaDB Client! Chunks changed from {old_total} to {new_total}.")
+            self.vector_store = Chroma(persist_directory=self.db_dir, embedding_function=self.embeddings)
 
-    def save_index(self):
-        """Saves current chunks to JSON database."""
+    def save_metadata(self):
+        """Saves current metadata to JSON database."""
         try:
-            with open(self.index_path, "w", encoding="utf-8") as f:
-                json.dump(self.documents, f, ensure_ascii=False, indent=2)
+            with open(self.metadata_path, "w", encoding="utf-8") as f:
+                json.dump(self.metadata, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            print(f"Error saving index: {e}")
+            print(f"Error saving metadata: {e}")
 
     def clear_index(self):
         """Clears all documents from RAG memory."""
-        self.documents = []
-        self.save_index()
+        self.metadata = {"files": [], "total_chunks": 0}
+        self.save_metadata()
+        
+        if os.path.exists(self.db_dir):
+            self.vector_store.delete_collection()
+            shutil.rmtree(self.db_dir, ignore_errors=True)
+            self.vector_store = Chroma(persist_directory=self.db_dir, embedding_function=self.embeddings)
+            
         # Clean uploaded files
         for f in os.listdir(settings.UPLOAD_DIR):
             file_path = os.path.join(settings.UPLOAD_DIR, f)
@@ -48,169 +76,76 @@ class RAGEngine:
             except Exception as e:
                 print(f"Error deleting file {file_path}: {e}")
 
-    def add_document(self, file_path, filename):
+    def add_document(self, file_path, filename, progress_callback=None):
         """Parses document and adds it to search index."""
-        text = ""
         ext = os.path.splitext(filename)[1].lower()
+        documents = []
         
         try:
             if ext == ".pdf":
-                reader = PdfReader(file_path)
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
+                loader = PyMuPDFLoader(file_path)
+                documents = loader.load()
+            elif ext == ".docx":
+                loader = Docx2txtLoader(file_path)
+                documents = loader.load()
             elif ext in [".txt", ".md", ".json"]:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    text = f.read()
+                loader = TextLoader(file_path, encoding="utf-8")
+                documents = loader.load()
             else:
                 return {"error": True, "message": f"Unsupported file extension: {ext}"}
         except Exception as e:
             return {"error": True, "message": f"Failed to parse document: {str(e)}"}
             
-        if not text.strip():
+        if not documents:
             return {"error": True, "message": "No text content found in document."}
 
+        # Add filename to metadata so we know where it came from
+        for doc in documents:
+            doc.metadata["source_file"] = filename
+
         # Create chunks
-        chunks = self.chunk_text(text)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+        chunks = text_splitter.split_documents(documents)
         
+        if not chunks:
+            return {"error": True, "message": "No text content extracted from document."}
+            
         # Add chunks to repository
-        new_chunks_count = 0
-        for i, chunk in enumerate(chunks):
-            chunk_id = f"{filename}_{i}"
-            # Avoid duplicate insertion
-            if not any(doc["id"] == chunk_id for doc in self.documents):
-                self.documents.append({
-                    "id": chunk_id,
-                    "file": filename,
-                    "text": chunk.strip()
-                })
-                new_chunks_count += 1
-                
-        self.save_index()
-        return {"success": True, "chunks_added": new_chunks_count, "total_chunks": len(chunks)}
-
-    def chunk_text(self, text, chunk_size=800, overlap=150):
-        """Chunks text based on characters while preserving sentence structures where possible."""
-        # Simple splitting by sentences/newlines to avoid cutting words in half
-        paragraphs = re.split(r'\n+', text)
-        chunks = []
-        current_chunk = ""
-        
-        for para in paragraphs:
-            para = para.strip()
-            if not para:
-                continue
-                
-            # If paragraph itself is too large, split by sentence or length
-            if len(para) > chunk_size:
-                sentences = re.split(r'(?<=[.!?])\s+', para)
-                for sent in sentences:
-                    if len(current_chunk) + len(sent) < chunk_size:
-                        current_chunk += " " + sent
-                    else:
-                        if current_chunk:
-                            chunks.append(current_chunk.strip())
-                        # Handle very long sentences
-                        if len(sent) > chunk_size:
-                            # Hard split
-                            words = sent.split(" ")
-                            sub_chunk = ""
-                            for word in words:
-                                if len(sub_chunk) + len(word) < chunk_size:
-                                    sub_chunk += " " + word
-                                else:
-                                    chunks.append(sub_chunk.strip())
-                                    sub_chunk = word
-                            current_chunk = sub_chunk
-                        else:
-                            current_chunk = sent
-            else:
-                if len(current_chunk) + len(para) < chunk_size:
-                    current_chunk += "\n" + para
-                else:
-                    if current_chunk:
-                        chunks.append(current_chunk.strip())
-                    current_chunk = para
-                    
-        if current_chunk:
-            chunks.append(current_chunk.strip())
+        # Avoid duplicate insertion by checking metadata (simplified approach)
+        if filename not in self.metadata["files"]:
+            self.metadata["files"].append(filename)
             
-        # Optional: Add overlap chunks (simplified overlap generation)
-        return chunks
-
-    def tokenize(self, text):
-        """Cleans and tokenizes text for keyword matching."""
-        # Lowercase and filter out non-alphanumeric
-        cleaned = re.sub(r'[^a-zA-Z0-9\s]', '', text.lower())
-        tokens = cleaned.split()
-        # Filter stop words (rudimentary)
-        stopwords = {"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "with", "is", "are", "was", "were", "of", "it", "this", "that", "these", "those"}
-        return [t for t in tokens if t not in stopwords and len(t) > 1]
-
-    def get_tfidf_scores(self, query):
-        """
-        Computes a simple but highly effective TF-IDF score for each document chunk.
-        """
-        query_tokens = self.tokenize(query)
-        if not query_tokens or not self.documents:
-            return []
-
-        # Count DF (Document Frequency) of query tokens
-        df = {}
-        for token in query_tokens:
-            df[token] = sum(1 for doc in self.documents if token in self.tokenize(doc["text"]))
-
-        # Compute IDF
-        N = len(self.documents)
-        idf = {}
-        for token, count in df.items():
-            # Apply smooth IDF
-            idf[token] = math.log((N + 1) / (count + 1)) + 1
-
-        scores = []
-        for doc in self.documents:
-            doc_tokens = self.tokenize(doc["text"])
-            if not doc_tokens:
-                continue
+            # Batch add to Chroma
+            batch_size = 100
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i+batch_size]
+                self.vector_store.add_documents(documents=batch)
                 
-            # Compute term frequencies and score
-            doc_len = len(doc_tokens)
-            score = 0.0
-            matched_terms = []
-            
-            for token in query_tokens:
-                tf = doc_tokens.count(token) / doc_len
-                if tf > 0:
-                    score += tf * idf[token]
-                    matched_terms.append(token)
-            
-            if score > 0:
-                scores.append({
-                    "document": doc,
-                    "score": score,
-                    "matched_terms": list(set(matched_terms))
-                })
+                if progress_callback:
+                    progress_callback(i + len(batch), len(chunks))
                 
-        # Sort by score descending
-        scores.sort(key=lambda x: x["score"], reverse=True)
-        return scores
+            self.metadata["total_chunks"] += len(chunks)
+            self.save_metadata()
+            
+        return {"success": True, "chunks_added": len(chunks), "total_chunks": self.metadata["total_chunks"]}
 
     def retrieve_context(self, query, top_k=3):
         """Retrieves top_k relevant text chunks as context for chatbot."""
-        if not self.documents:
+        self.load_metadata() # Force reload from disk in case Celery updated it
+        if not self.metadata["files"]:
             return ""
             
-        results = self.get_tfidf_scores(query)
-        if not results:
+        # Retrieve context from Chroma based on semantic similarity
+        docs = self.vector_store.similarity_search(query, k=top_k)
+        if not docs:
             return ""
 
         context_parts = []
-        for i, res in enumerate(results[:top_k]):
-            doc = res["document"]
+        for i, doc in enumerate(docs):
+            source_file = doc.metadata.get("source_file", "Unknown Document")
             context_parts.append(
-                f"--- [SOURCE DOCUMENT: {doc['file']} (Segment {i+1})] ---\n"
-                f"{doc['text']}"
+                f"--- [SOURCE DOCUMENT: {source_file} (Segment {i+1})] ---\n"
+                f"{doc.page_content}"
             )
             
         return "\n\n".join(context_parts)
@@ -220,13 +155,10 @@ class RAGEngine:
         Searches the live web for company details or news.
         Returns a tuple of (context_string, list_of_sources)
         """
-        import requests  # Imported here or at the top of the file
-        
         search_api_key = os.getenv("WEB_SEARCH_API_KEY")
         if not search_api_key:
             return "", []
 
-        # Example utilizing the Tavily Search API
         url = "https://api.tavily.com/search"
         payload = {
             "api_key": search_api_key,
@@ -249,8 +181,8 @@ class RAGEngine:
                     
                     sources.append(f"{title} ({link})")
                     context_parts.append(
-                        f"--- [WEB SOURCE: {title}] ---\\n"
-                        f"URL: {link}\\n"
+                        f"--- [WEB SOURCE: {title}] ---\n"
+                        f"URL: {link}\n"
                         f"Content: {content}"
                     )
                 
@@ -262,11 +194,11 @@ class RAGEngine:
 
     def get_all_sources(self):
         """Returns details about loaded files."""
-        files = list(set(doc["file"] for doc in self.documents))
+        self.load_metadata() # Force reload from disk
         return {
-            "total_documents": len(files),
-            "files": files,
-            "total_chunks": len(self.documents)
+            "total_documents": len(self.metadata["files"]),
+            "files": self.metadata["files"],
+            "total_chunks": self.metadata["total_chunks"]
         }
 
 rag_engine = RAGEngine()

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - SarvamAI Enterprise Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="index.css">
+    <style>
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: var(--bg-dark);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .auth-card {
+            background-color: var(--bg-panel);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .auth-card h2 {
+            margin-bottom: 10px;
+            font-family: 'Outfit', sans-serif;
+            color: var(--text-primary);
+        }
+        .auth-card p {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+        .auth-form input {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        .auth-form input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .auth-btn:hover {
+            background-color: var(--primary-hover);
+        }
+        .auth-links {
+            margin-top: 20px;
+            color: var(--text-secondary);
+        }
+        .auth-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+        .error-message {
+            color: #ef4444;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success-message {
+            color: #10b981;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .role-selector {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .role-selector label {
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="logo-container" style="justify-content: center; margin-bottom: 20px;">
+                <i class="fa-solid fa-brain-circuit logo-icon" style="font-size: 2rem; color: var(--primary-color);"></i>
+                <h1 style="font-family: 'Outfit'; font-size: 1.8rem; margin-left: 10px;">Sarvam<span>AI</span></h1>
+            </div>
+            <h2>Create an Account</h2>
+            <p>Join the Enterprise Assistant Platform</p>
+            
+            <div id="signup-error" class="error-message"></div>
+            <div id="signup-success" class="success-message">Account created! Redirecting...</div>
+            
+            <form id="signup-form" class="auth-form">
+                <div class="role-selector">
+                    <label>
+                        <input type="radio" name="role" value="customer" checked> Customer
+                    </label>
+                    <label>
+                        <input type="radio" name="role" value="employee"> Employee
+                    </label>
+                </div>
+                <input type="text" id="username" placeholder="Username" required>
+                <input type="email" id="email" placeholder="Email Address" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit" class="auth-btn">Send Verification Code</button>
+            </form>
+
+            <form id="otp-form" class="auth-form" style="display: none;">
+                <p style="color: var(--text-primary); font-size: 0.9rem; margin-bottom: 15px;">We sent a 6-digit verification code to your email.</p>
+                <input type="text" id="otp-code" placeholder="000000" required maxlength="6" style="text-align: center; letter-spacing: 6px; font-weight: bold; font-size: 1.5rem;">
+                <button type="submit" class="auth-btn">Verify Account</button>
+            </form>
+            
+            <div class="auth-links">
+                Already have an account? <a href="login.html">Sign in here</a>
+            </div>
+        </div>
+    </div>
+    
+    <script src="auth.js"></script>
+</body>
+</html>

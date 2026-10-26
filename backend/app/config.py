@@ -39,8 +39,8 @@ class Settings:
         
         # Runtime terminal validation print block
         if not self.SARVAM_API_KEY:
-            print("\n⚠️ WARNING: SARVAM_API_KEY extracted as EMPTY string from configuration file.")
+            print("\n[WARNING] SARVAM_API_KEY extracted as EMPTY string from configuration file.")
         else:
-            print(f"\n✅ SUCCESS: API Configuration linked cleanly. Key signature: {self.SARVAM_API_KEY[:6]}...")
+            print(f"\n[SUCCESS] API Configuration linked cleanly. Key signature: {self.SARVAM_API_KEY[:6]}...")
 
 settings = Settings()

@@ -29,7 +29,20 @@ def search_tavily(query: str) -> dict:
             
             results = data.get("results", [])
             tavily_answer = data.get("answer", "")
-            snippets = [f"{r.get('title', 'Headline')}: {r.get('content', '').strip()} URL: {r.get('url', '')}" for r in results[:10]]
+            
+            seen_urls = set()
+            snippets = []
+            for r in results:
+                if len(snippets) >= 2:
+                    break
+                url = r.get("url", "")
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    content = r.get('content', '').strip()
+                    # Truncate content to avoid huge payloads
+                    if len(content) > 300:
+                        content = content[:300] + "..."
+                    snippets.append(f"{r.get('title', 'Headline')}: {content} URL: {url}")
             
             raw_context = f"Summary Answer: {tavily_answer}\n\n" + "\n".join(snippets)
             
@@ -44,14 +57,6 @@ def search_tavily(query: str) -> dict:
                     "Summary Answer: Global and domestic news updates for 2026.\n\n"
                     "India's AI manufacturing sector sees massive 2026 growth. URL: https://timesofindia.indiatimes.com/tech\n"
                     "RBI introduces new digital currency framework in India. URL: https://www.thehindu.com/business\n"
-                    "ISRO launches new satellite constellation for internet connectivity. URL: https://www.isro.gov.in/news\n"
-                    "Mumbai-Ahmedabad bullet train completes final safety trials. URL: https://www.hindustantimes.com/india\n"
-                    "Indian startups attract record foreign investment in Q1. URL: https://economictimes.indiatimes.com/startups\n"
-                    "Global climate summit 2026 agrees on historic carbon targets. URL: https://www.bbc.com/news/science-environment\n"
-                    "US and EU sign comprehensive technology trade pact. URL: https://www.reuters.com/world\n"
-                    "Breakthrough in quantum computing announced in Geneva. URL: https://www.nature.com/news\n"
-                    "New pandemic preparedness treaty ratified by UN. URL: https://www.who.int/news\n"
-                    "Global markets hit all-time highs amidst AI tech boom. URL: https://www.bloomberg.com/markets\n"
                 )
                 return {"context": mock_context, "sources": []}
 

@@ -105,16 +105,18 @@ h1, h2, h3, h4, h5, h6 {
    LAYOUT STRUCTURE
    ========================================================================== */
 .app-container {
-    display: grid;
-    grid-template-columns: 340px 1fr;
+    display: flex;
     height: 100vh;
     width: 100vw;
+    overflow: hidden;
 }
 
 /* ==========================================================================
    SIDEBAR COMPONENT
    ========================================================================== */
 .sidebar {
+    width: 340px;
+    flex-shrink: 0;
     background-color: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -123,7 +125,23 @@ h1, h2, h3, h4, h5, h6 {
     padding: 1.5rem;
     gap: 1.2rem;
     overflow-y: auto;
-    transition: background-color var(--transition-normal), border-right var(--transition-normal);
+    overflow-x: hidden;
+    margin-left: 0;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed {
+    margin-left: -340px;
+}
+
+.chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    background-color: var(--bg-primary);
 }
 
 .brand-section {
@@ -564,19 +582,71 @@ input:checked + .slider:before {
     width: 100%;
 }
 
-/* Sidebar Footer */
+/* Sidebar Footer & User Profile */
 .sidebar-footer {
     margin-top: auto;
     display: flex;
+    flex-direction: column;
     justify-content: space-between;
-    align-items: center;
     border-top: 1px solid var(--border-color);
     padding-top: 1rem;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-weight: 500;
 }
 
+.user-profile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bg-tertiary);
+    padding: 0.6rem;
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.avatar-icon {
+    font-size: 1.5rem;
+    color: var(--accent-primary);
+}
+
+.user-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.user-role {
+    font-size: 0.65rem;
+    color: var(--accent-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.logout-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.4rem;
+    border-radius: var(--border-radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.logout-btn:hover {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}
 .theme-switcher {
     display: flex;
     background-color: var(--bg-primary);
@@ -584,6 +654,7 @@ input:checked + .slider:before {
     border-radius: 20px;
     padding: 2px;
     gap: 2px;
+    margin-top: 10px;
 }
 
 .theme-switcher i {
@@ -969,7 +1040,27 @@ input:checked + .slider:before {
     justify-content: space-between;
     padding: 0.8rem 1.2rem;
     z-index: 100;
-    animation: player-pop-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform var(--transition-fast) cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 @keyframes player-pop-up {
@@ -1467,4 +1558,66 @@ body.light-theme .thinking-content {
 .email-draft-card:hover {
     border-color: var(--accent-primary, #6366f1) !important;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* ==========================================================================
+   HISTORY ACCORDION STYLES
+   ========================================================================== */
+.collapsible-content {
+    max-height: 500px;
+    overflow-y: auto;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease-in-out, margin-top 0.3s ease;
+    opacity: 1;
+    margin-top: 0.8rem;
+}
+
+.collapsible-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    overflow: hidden;
+}
+
+#history-toggle-icon.rotated {
+    transform: rotate(-180deg);
+}
+
+/* ==========================================================================
+   TOAST NOTIFICATIONS
+   ========================================================================== */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast-notification {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transform: translateX(120%);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    max-width: 300px;
+}
+
+.toast-notification.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-notification i {
+    color: var(--accent-primary);
+    font-size: 1.1rem;
 }

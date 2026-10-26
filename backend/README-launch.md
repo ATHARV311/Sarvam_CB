@@ -31,3 +31,8 @@ Notes:
 - Scripts install dependencies using `pip install --user -r requirements.txt` to avoid modifying system-wide packages.
 - Running without a venv may lead to package version conflicts with other projects. Prefer a venv if you can.
 - The server starts uvicorn on `127.0.0.1:8000` with `--reload` for development.
+
+
+
+
+
